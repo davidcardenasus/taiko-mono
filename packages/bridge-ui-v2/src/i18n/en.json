@@ -12,9 +12,39 @@
   "bridge": {
     "title": {
       "default": "Bridge Token",
-      "nft": "Bridge NFT"
+      "nft": {
+        "import": "Import NFT",
+        "review": "Review",
+        "confirm": "Confirm"
+      }
     },
-    "description": "Send your assets across chains.",
+    "description": {
+      "default": "Send your assets across chains.",
+      "nft": {
+        "import": "Transfer your NFTs across chains",
+        "review": "Verify your NFT details.",
+        "confirm": "Confirm your NFT details."
+      }
+    },
+    "nft": {
+      "step": {
+        "import": {
+          "title": "Import NFT",
+          "description": "Import your NFT from the source chain.",
+          "scan_screen": {
+            "title": "Scan for NFT",
+            "description": "Don't see your NFTs? Try adding them manually!"
+          }
+        },
+        "review": {
+          "title": "Import NFT",
+          "description": "Review your NFT details.",
+          "token_id": "Token ID",
+          "your_tokens": "Your tokens on"
+        },
+        "confirm": "Confirm"
+      }
+    },
     "actions": {
       "approve": {
         "tx": "Transaction sent to approve {token} tokens. Click <a href=\"{url}\" target=\"_blank\"><b>here</b></a> to see it in the explorer.",
@@ -24,7 +54,10 @@
       "bridge": {
         "tx": "Transaction sent to bridge {token} tokens. Click <a href=\"{url}\" target=\"_blank\"><b>here</b></a> to see it in the explorer.",
         "success": "Transaction completed!. Your funds are getting ready to be claimed on {network}"
-      }
+      },
+      "nft_scan": "Scan for NFT",
+      "nft_scan_again": "Scan again",
+      "nft_manual": "Add manually"
     },
     "errors": {
       "send_erc20_error": "Failed to send ERC20 token",
@@ -48,7 +81,8 @@
       "approved": "Approved",
       "bridge": "Bridge",
       "bridging": "Bridging",
-      "import": "Fetch NFT data"
+      "fetch": "Fetch NFT data",
+      "import": "Import"
     }
   },
   "recipient": {
@@ -194,18 +228,23 @@
     }
   },
   "inputs": {
-    "nft": {
-      "token_id": {
-        "label": "Token ID(s)",
-        "placeholder": "1 or 5,14,733"
+    "token_id_input": {
+      "label": "Token ID(s)",
+      "placeholder": "1 or 5,14,733",
+      "errors": {
+        "invalid": "Not a valid numeric value"
       }
     },
     "address_input": {
-      "label": "Address",
-      "placeholder": "Enter an address",
+      "label": {
+        "default": "Address",
+        "contract": "Contract address",
+        "recipient": "Recipient address"
+      },
+      "placeholder": "Enter a valid ethereum address",
       "errors": {
         "invalid": "Invalid address format",
-        "too_short": "Address length is too short"
+        "too_short": "Address is too short"
       },
       "success": "Valid address format"
     },
@@ -261,12 +300,18 @@
   },
   "common": {
     "edit": "Edit",
+    "continue": "Continue",
     "cancel": "Cancel",
     "confirm": "Confirm",
     "close": "Close",
     "loading": "Loading",
     "ok": "Ok",
     "name": "Name",
-    "balance": "Balance"
+    "balance": "Balance",
+    "destination": "Destination",
+    "contract_address": "Contract address",
+    "id": "ID",
+    "collection": "Collection",
+    "address": "Address"
   }
 }

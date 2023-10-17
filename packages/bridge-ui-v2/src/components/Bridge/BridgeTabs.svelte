@@ -1,25 +1,34 @@
 <script lang="ts">
   import { t } from 'svelte-i18n';
 
-  import { page } from '$app/stores';
-  import { LinkButton } from '$components/LinkButton';
   import { PUBLIC_NFT_BRIDGE_ENABLED } from '$env/static/public';
   import { classNames } from '$libs/util/classNames';
 
+  import { activeBridge } from './state';
+  import { BridgeTypes } from './types';
+
   let classes = classNames('space-x-2', $$props.class);
 
-  $: isERC20Bridge = $page.route.id === '/';
-  $: isNFTBridge = $page.route.id === '/nft';
+  $: isERC20Bridge = $activeBridge === BridgeTypes.FUNGIBLE;
+  $: isNFTBridge = $activeBridge === BridgeTypes.NFT;
+
+  const onBridgeClick = (type: BridgeTypes) => {
+    activeBridge.set(type);
+  };
 </script>
 
 {#if PUBLIC_NFT_BRIDGE_ENABLED === 'true'}
   <div class={classes}>
-    <LinkButton class="py-2 px-[20px]" href="/" active={isERC20Bridge}>
+    <button
+      class="{isERC20Bridge ? 'btn-primary text-white' : 'btn-ghost'} h-[40px] px-[28px] rounded-full"
+      on:click={() => onBridgeClick(BridgeTypes.FUNGIBLE)}>
       <span> {$t('nav.token')}</span>
-    </LinkButton>
+    </button>
 
-    <LinkButton class="py-2 px-[20px]" href="/nft" active={isNFTBridge}>
+    <button
+      class="{isNFTBridge ? 'btn-primary text-white' : 'btn-ghost'}  h-[40px] px-[28px] rounded-full"
+      on:click={() => onBridgeClick(BridgeTypes.NFT)}>
       <span> {$t('nav.nft')}</span>
-    </LinkButton>
+    </button>
   </div>
 {/if}
