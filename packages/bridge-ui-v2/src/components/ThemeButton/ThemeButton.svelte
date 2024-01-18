@@ -2,29 +2,30 @@
   import { onMount } from 'svelte';
 
   import { Icon } from '$components/Icon';
+  import { Theme,theme } from '$stores/theme';
 
-  let theme: 'dark' | 'light' = (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
-  $: isDarkTheme = theme === 'dark';
+  $: isDarkTheme = $theme === Theme.DARK;
 
   function switchTheme() {
-    const currentTheme = localStorage.getItem('theme')?.toLocaleLowerCase() || 'dark';
-    theme = currentTheme === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
+    const currentTheme = $theme;
+    const newTheme = currentTheme === Theme.DARK ? Theme.LIGHT : Theme.DARK;
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    $theme = newTheme;
   }
 
   onMount(() => {
     const current = localStorage.getItem('theme');
-    if (!current || (current !== 'dark' && current !== 'light')) {
-      theme = 'dark';
+    if (!current || (current !== Theme.DARK && current !== Theme.LIGHT)) {
+      $theme = Theme.DARK;
     } else {
-      theme = current as 'dark' | 'light';
+      $theme = current as Theme;
     }
   });
 </script>
 
 <label class="swap swap-rotate">
   <input type="checkbox" class="border-none" bind:checked={isDarkTheme} on:change={switchTheme} />
-  <Icon type="sun" class="fill-primary-icon swap-on" width={25} height={25} vHeight={25} vWidth={25} />
-  <Icon type="moon" class="fill-primary-icon swap-off" width={25} height={25} vHeight={25} vWidth={25} />
+  <Icon type="sun" class="fill-primary-icon swap-on " size={25} />
+  <Icon type="moon" class="fill-primary-icon swap-off" size={25} />
 </label>

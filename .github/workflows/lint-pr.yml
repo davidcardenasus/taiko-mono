@@ -19,18 +19,16 @@ jobs:
           scopes: |
             repo
             branding
-            bridge-ui
             bridge-ui-v2
             deps
             eventindexer
             fork-diff
-            pos-dashboard
+            guardian-prover-health-check
+            guardian-prover-health-check-ui
             protocol
             relayer
             starter-dapp
             status-page
             tokenomics
-            website
-            whitepaper
             deps-dev
           requireScope: true

@@ -16,7 +16,7 @@ Let's go deeper into the steps that occur when bridging ETH from srcChain to des
 ### Send message / Send token
 
 The bridge distinguishes 4 different token types: `Ether`, `Erc20`, `Erc1155`, `Erc721`.
-Each type has it's own vault contract both deployed to the source and destination chain. (Except `EtherVault`, which is only deployed on L1 and Bridge itself holds the funds on L2.)
+Each type has its own vault contract both deployed to the source and destination chain. (Except `EtherVault`, which is only deployed on L1 and Bridge itself holds the funds on L2.)
 
 #### Bridging Ether
 
@@ -40,7 +40,7 @@ If user wants to bridge ether, he/she will initiate a bridge transaction with `s
         address refundAddress;
         // value to invoke on the destination chain, for ERC20 transfers.
         uint256 value;
-        // Processing fee for the relayer. Zero if user will process themself.
+        // Processing fee for the relayer. Zero if user will process themselves.
         uint256 fee;
         // gasLimit to invoke on the destination chain, for ERC20 transfers.
         uint256 gasLimit;

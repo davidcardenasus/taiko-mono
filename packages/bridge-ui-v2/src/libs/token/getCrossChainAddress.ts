@@ -1,7 +1,7 @@
 import { type Address, getContract } from '@wagmi/core';
 import { type Abi, zeroAddress } from 'viem';
 
-import { erc20VaultABI, erc721VaultABI } from '$abi';
+import { erc20VaultABI, erc721VaultABI, erc1155VaultABI } from '$abi';
 import { routingContractsMap } from '$bridgeConfig';
 import { chains } from '$libs/chain';
 import { getLogger } from '$libs/util/logger';
@@ -32,8 +32,19 @@ export async function getCrossChainAddress({
     return token.addresses[destChainId];
   }
 
-  const vaultABI = token.type === TokenType.ERC721 ? erc721VaultABI : erc20VaultABI;
-  const vaultAddressKey = token.type === TokenType.ERC721 ? 'erc721VaultAddress' : 'erc20VaultAddress';
+  const vaultABI =
+    token.type === TokenType.ERC721
+      ? erc721VaultABI
+      : token.type === TokenType.ERC1155
+      ? erc1155VaultABI
+      : erc20VaultABI;
+
+  const vaultAddressKey =
+    token.type === TokenType.ERC721
+      ? 'erc721VaultAddress'
+      : token.type === TokenType.ERC1155
+      ? 'erc1155VaultAddress'
+      : 'erc20VaultAddress';
 
   // it could be that we don't have the token address on the current chain, but we might it on another chain
   if (!existsOnSourceChain) {
@@ -80,7 +91,7 @@ export async function getCrossChainAddress({
 
     // first we need to figure out the canonical address of the token
     const canonicalTokenInfo = (await srcTokenVaultContract.read.bridgedToCanonical([srcChainTokenAddress])) as Address;
-    const canonicalTokenAddress = canonicalTokenInfo[1]; // this will break if the contracts ever change the order of the return values
+    const canonicalTokenAddress = canonicalTokenInfo[1] as Address; // this will break if the contracts ever change the order of the return values
 
     // if the canonical address is 0x0, then the token is canonical
     if (canonicalTokenAddress === zeroAddress) {
@@ -93,10 +104,16 @@ export async function getCrossChainAddress({
     } else {
       // if we have found a canonical, we can check for the bridged address on the source token vault
       // e.g. bridging L2 -> L1 with native L1 token
-      return (await srcTokenVaultContract.read.canonicalToBridged([
+      const bridgedCanonical = (await srcTokenVaultContract.read.canonicalToBridged([
         BigInt(destChainId),
         canonicalTokenAddress,
       ])) as Address;
+
+      if (bridgedCanonical === srcChainTokenAddress) {
+        return canonicalTokenAddress;
+      } else {
+        return bridgedCanonical;
+      }
     }
   }
 }

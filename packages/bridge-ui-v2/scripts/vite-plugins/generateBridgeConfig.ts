@@ -26,7 +26,9 @@ export function generateBridgeConfig() {
     async buildStart() {
       logger.info('Plugin initialized.');
       let configuredBridgesConfigFile;
-      if (!skip) {
+      if (skip) {
+        configuredBridgesConfigFile = '';
+      } else {
         if (!process.env.CONFIGURED_BRIDGES) {
           throw new Error(
             'CONFIGURED_BRIDGES is not defined in environment. Make sure to run the export step in the documentation.',
@@ -42,8 +44,6 @@ export function generateBridgeConfig() {
         if (!isValid) {
           throw new Error('encoded configuredBridges.json is not valid.');
         }
-      } else {
-        configuredBridgesConfigFile = '';
       }
 
       const tsFilePath = path.resolve(outputPath);
@@ -61,8 +61,6 @@ export function generateBridgeConfig() {
       // Save the file
       await sourceFile.saveSync();
       logger.info(`Generated config file`);
-
-      await sourceFile.saveSync();
 
       const formatted = await formatSourceFile(tsFilePath);
 

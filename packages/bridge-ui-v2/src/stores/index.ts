@@ -1,4 +1,4 @@
 export { account } from './account';
+export { metadataCache } from './metadata';
 export { network } from './network';
-export * from './nfts';
 export { pendingTransactions } from './pendingTransactions';

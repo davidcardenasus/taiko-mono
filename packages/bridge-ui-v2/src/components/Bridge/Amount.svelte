@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
   import { t } from 'svelte-i18n';
   import { formatUnits, parseUnits } from 'viem';
 
@@ -8,8 +7,13 @@
   import { LoadingText } from '$components/LoadingText';
   import { warningToast } from '$components/NotificationToast';
   import { checkBalanceToBridge, getMaxAmountToBridge } from '$libs/bridge';
-  import { InsufficientAllowanceError, InsufficientBalanceError, RevertedWithFailedError } from '$libs/error';
-  import { ETHToken, getBalance as getTokenBalance, TokenType } from '$libs/token';
+  import {
+    InsufficientAllowanceError,
+    InsufficientBalanceError,
+    RevertedWithFailedError,
+    UnknownTokenTypeError,
+  } from '$libs/error';
+  import { ETHToken, getBalance as getTokenBalance, type NFT, TokenType } from '$libs/token';
   import { renderBalance } from '$libs/util/balance';
   import { debounce } from '$libs/util/debounce';
   import { getLogger } from '$libs/util/logger';
@@ -36,10 +40,17 @@
   let inputId = `input-${uid()}`;
   let inputBox: InputBox;
   let computingMaxAmount = false;
+  let invalidInput = false;
 
-  onDestroy(() => {
-    clearAmount();
-  });
+  $: balance = $tokenBalance
+    ? typeof $tokenBalance === 'bigint'
+      ? $tokenBalance > BigInt(0)
+        ? $tokenBalance
+        : BigInt(0) // ERC721/1155
+      : 'value' in $tokenBalance && $tokenBalance.value > BigInt(0)
+      ? $tokenBalance.value
+      : BigInt(0) // ERC20
+    : BigInt(0);
 
   // Public API
   export function clearAmount() {
@@ -48,9 +59,10 @@
   }
 
   export async function validateAmount(token = $selectedToken, fee = $processingFee) {
+    if (!$network?.id) return;
+    $validatingAmount = true; // During validation, we disable all the actions
     $insufficientBalance = false;
     $insufficientAllowance = false;
-    $validatingAmount = true; // During validation, we disable all the actions
 
     const to = $recipientAddress || $account?.address;
 
@@ -72,9 +84,13 @@
         token,
         amount: $enteredAmount,
         fee,
-        balance: $tokenBalance.value,
+        balance,
         srcChainId: $network.id,
         destChainId: $destNetwork.id,
+        tokenIds:
+          $selectedToken.type === TokenType.ERC721 || $selectedToken.type === TokenType.ERC1155
+            ? [BigInt((token as NFT).tokenId)]
+            : [],
       });
     } catch (err) {
       switch (true) {
@@ -85,9 +101,13 @@
           $insufficientAllowance = true;
           break;
         case err instanceof RevertedWithFailedError:
-          warningToast($t('messages.network.rejected'));
+          warningToast({ title: $t('messages.network.rejected') });
+          break;
+        default:
+          invalidInput = true;
           break;
       }
+      console.error('Error validating amount: ', err);
     } finally {
       $validatingAmount = false;
     }
@@ -105,20 +125,22 @@
     $errorComputingBalance = false;
 
     try {
-      if (token.type !== TokenType.ETH) {
+      if (token.type === TokenType.ERC20) {
         $tokenBalance = await getTokenBalance({
           token,
           srcChainId,
           destChainId,
           userAddress,
         });
-      } else {
+      } else if (token.type === TokenType.ETH) {
         $tokenBalance = await getTokenBalance({
           token: ETHToken,
           srcChainId,
           destChainId,
           userAddress,
         });
+      } else {
+        $tokenBalance = token.balance;
       }
     } catch (err) {
       log('Error updating balance: ', err);
@@ -133,16 +155,40 @@
   // We want to debounce this function for input events.
   // Could happen as the user enters an amount
   const debouncedValidateAmount = debounce(validateAmount, 300);
+  let sanitizedValue = '';
 
-  // Will trigger on input events. We update the entered amount
-  // and check it's validity
   function inputAmount(event: Event) {
+    invalidInput = false;
+    $validatingAmount = true; // During validation, we disable all the actions
     if (!$selectedToken) return;
+    const target = event.target as HTMLInputElement;
+    let value = target.value;
 
-    const { value } = event.target as HTMLInputElement;
-    $enteredAmount = parseUnits(value, $selectedToken.decimals);
+    if ($selectedToken.type === TokenType.ERC1155) {
+      // For ERC1155, no decimals are allowed
+      if (/[.,]/.test(value)) {
+        invalidInput = true;
+        return;
+      }
+    } else if ($selectedToken.type === TokenType.ERC20 || $selectedToken.type === TokenType.ETH) {
+      // For ERC20 or ETH, replace commas with dots
+      value = value.replace(/[,]/g, '.');
+    } else {
+      throw new UnknownTokenTypeError($selectedToken.type);
+    }
 
+    sanitizedValue = value;
+
+    if ($selectedToken.type === TokenType.ERC1155 || !$selectedToken.decimals) {
+      $enteredAmount = BigInt(sanitizedValue);
+    } else {
+      $enteredAmount = parseUnits(sanitizedValue, $selectedToken.decimals);
+    }
     debouncedValidateAmount();
+  }
+
+  $: if (inputBox && sanitizedValue !== inputBox.getValue()) {
+    inputBox.setValue(sanitizedValue); // Update InputBox value if sanitizedValue changes
   }
 
   // "MAX" button handler
@@ -153,29 +199,36 @@
     computingMaxAmount = true;
 
     try {
-      const maxAmount = await getMaxAmountToBridge({
-        to: $recipientAddress || $account.address,
-        token: $selectedToken,
-        balance: $tokenBalance.value,
-        fee: $processingFee,
-        srcChainId: $network.id,
-        destChainId: $destNetwork.id,
-        amount: BigInt(1), // whatever amount to estimate the cost
-      });
+      let maxAmount;
 
-      // Update UI
-      // Note: triggering the event manually does not always work, specially
-      // in other browsers (looking at you, Safari!!)
-      inputBox.setValue(formatUnits(maxAmount, $selectedToken.decimals));
+      if ($selectedToken.type === TokenType.ERC721 || $selectedToken.type === TokenType.ERC1155) {
+        $enteredAmount = $tokenBalance as bigint;
+        inputBox.setValue($enteredAmount.toString());
+      } else {
+        maxAmount = await getMaxAmountToBridge({
+          to: $recipientAddress || $account.address,
+          token: $selectedToken,
+          balance,
+          fee: $processingFee,
+          srcChainId: $network.id,
+          destChainId: $destNetwork.id,
+          amount: BigInt(1), // whatever amount to estimate the cost
+        });
 
-      // Update state
-      $enteredAmount = maxAmount;
+        // Update UI
+        // Note: triggering the event manually does not always work, specially
+        // in other browsers (looking at you, Safari!!)
+        inputBox.setValue(formatUnits(maxAmount, $selectedToken.decimals));
+
+        // Update state
+        $enteredAmount = maxAmount;
+      }
 
       // Check validity
       validateAmount();
     } catch (err) {
       console.error(err);
-      warningToast($t('amount.errors.failed_max'));
+      warningToast({ title: $t('amount.errors.failed_max') });
     } finally {
       computingMaxAmount = false;
     }
@@ -188,6 +241,8 @@
   // There is no reason to show any error/warning message if we are computing the balance
   // or there is an issue computing it
   $: showInsufficientBalanceAlert = $insufficientBalance && !$errorComputingBalance && !$computingBalance;
+
+  $: noDecimalsAllowedAlert = invalidInput;
 
   // TODO: Disabled for now, potentially confusing users
   // $: showInsiffucientAllowanceAlert = $insufficientAllowance && !$errorComputingBalance && !$computingBalance;
@@ -212,7 +267,6 @@
       {/if}
     </div>
   </div>
-
   <div class="relative">
     <div class="relative f-items-center">
       <InputBox
@@ -220,11 +274,11 @@
         type="number"
         placeholder="0.01"
         min="0"
-        disabled={$errorComputingBalance || computingMaxAmount}
-        error={$insufficientBalance}
+        disabled={computingMaxAmount}
+        error={$insufficientBalance || invalidInput}
         on:input={inputAmount}
         bind:this={inputBox}
-        class="py-6 pr-16 px-[26px] title-subsection-bold border-0" />
+        class="py-6 pr-16 px-[26px] title-subsection-bold border-0  {$$props.class}" />
       <!-- TODO: talk to Jane about the MAX button and its styling -->
       <button
         class="absolute right-6 uppercase hover:font-bold"
@@ -235,11 +289,13 @@
     </div>
     <div class="flex mt-[8px] min-h-[24px]">
       {#if showInsufficientBalanceAlert}
-        <FlatAlert type="error" message={$t('bridge.errors.insufficient_balance')} class="relative" />
+        <FlatAlert type="error" message={$t('bridge.errors.insufficient_balance.title')} class="relative" />
         <!-- TODO: Disabled for now, potentially confusing users -->
 
         <!-- {:else if showInsiffucientAllowanceAlert}
         <FlatAlert type="warning" message={$t('bridge.errors.insufficient_allowance')} class="absolute" /> -->
+      {:else if noDecimalsAllowedAlert}
+        <FlatAlert type="error" message={$t('bridge.errors.no_decimals_allowed')} class="relative" />
       {/if}
     </div>
   </div>
